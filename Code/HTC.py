@@ -7,74 +7,65 @@ class Brain:
         self.W = W
         self.n_neurons = W.shape[0]
 
-    def set_netowrk_parameters(self, r1, r2, tc, tmin=0.01, tmax=3, delta_tc=0.1):
+    def set_netowrk_parameters(self, r1, r2, tc):
         self.r1 = r1
         self.r2 = r2
         self.tc = tc
-        self.tmin = tmin
-        self.tmax = tmax
-        self.delta_tc = delta_tc
 
-    def set_simulation_parameters(self, dt, n_timesteps, runs):
-        self.dt = dt  # timestep
-        self.n_timesteps = n_timesteps  # total number of steps in the simulation
-        self.n_runs = runs  # parallel simulations fof random configs
+    def simulation(self, active_frac=0.1, n_runs=100,
+                   tmin=0.001, tmax=0.3, delta_tc=0.1,
+                   dt=0.1, n_timesteps=600):
 
-    def simulation(self, active_frac=0.1, n_runs=100):
-        n_neurons = self.W.shape[0]
+        n_neurons = self.n_neurons
+        total_time = dt*n_timesteps
 
         # Array of the tested tc for each simulation
-        tc = np.arange(self.tmin, self.tmax, self.delta_tc, dtype=np.float64)
+        tc = np.arange(tmin, tmax, delta_tc, dtype=np.float64)
 
-        # Array containing tc and associated activity
+        # Arrays containing activity, sigma activity, s1 and s2
         activity = np.zeros_like(tc, dtype=np.float64)
-
-        # Matrix containing activities of neurons for each run
-        activity_t = np.zeros((self.n_timesteps), dtype=np.float64)
+        sigma_activity = np.zeros_like(tc, dtype=np.float64)
+        #s1 = s2 = np.zeros_like(tc, dtype=np.float64)
 
         # Init of random states for the simulation
-        states_init = generate_initial_conf(active_frac, n_neurons, n_runs)
-
+        states_init = generate_initial_conf(active_frac=active_frac,
+                                            n_neurons=n_neurons,
+                                            n_runs=n_runs)
         # For every tc
-        for i, t in enumerate(tc):
+        for i_tc, tc_testing in enumerate(tc):
+
+            # Matrix containing activities
+            activity_rtn = np.zeros(
+                (n_runs, n_timesteps, n_neurons), dtype=np.float64)
 
             # Copy the random states
             states = states_init
 
-            # Init a temporary obj to store all the activity (for each run and neuron)
-            temp_act = np.zeros(states.shape, dtype=np.float64)
-
             # Initial adjustment of the system
             for dummy in range(100):
-                states, temp_act = update_states(
-                    self.r1, self.r2, t, self.W, states)
+                states, temp_act = update_states(states=states,
+                                                 r1=self.r1, r2=self.r2, tc=tc_testing, W=self.W)
 
             # Real simulation
             # For each time step:
-            for time in range(self.n_timesteps):
+            for timestep in range(n_timesteps):
 
                 # Save states and activity
-                states, temp_act = update_states(
-                    self.r1, self.r2, t, self.W, states)
+                states, activity_rtn[:, timestep] = update_states(states=states,
+                                                                  r1=self.r1, r2=self.r2, tc=tc_testing, W=self.W)
 
-                # Compute activty at time t
-                # Sum all 1s in the temp_act matrix
-                # and divide by total number of neurons and runs
-                activity_t[time] = ((temp_act.sum()).sum())/(n_neurons*n_runs)
-
-            # Save the mean activity for the simulation at chosen tc
-            activity[i] = activity_t.sum()/(self.dt*self.n_timesteps)
-
-            print("End of ", t)
+            At = np.mean(activity_rtn, axis=2)
+            activity[i_tc] = np.mean(At)
+            sigma_activity[i_tc] = np.mean(np.std(At, axis=1))
 
         # Return vector of tc and associated activities
-        return (tc, activity)
+        return tc, activity, sigma_activity  # , s1, s2
 
  ##################################
 
 
 @jit(nopython=True)
-def generate_initial_conf(active_frac=0.5, n_neurons=998, n_runs=100):
+def generate_initial_conf(active_frac, n_neurons, n_runs):
     """
     Generate n_runs initial *random* configurations of states for every n_neuron 
     """
@@ -122,8 +113,8 @@ def update_neurons(state_neurons, r1, r2, tc, W):
             (state_neurons == -1)*(p > r2)*(-1))
 
 
-@jit(nopython=True)  # , parallel=True)
-def update_states(r1, r2, tc, W, states):
+@jit(nopython=True)
+def update_states(states, r1, r2, tc, W):
     # save the number of runs in total
     n_runs = states.shape[0]
 
@@ -135,3 +126,46 @@ def update_states(r1, r2, tc, W, states):
         temp_states[run] = update_neurons(states[run], r1, r2, tc, W)
 
     return temp_states, (temp_states == 1).astype(np.float64)
+
+
+
+
+# Return a list of the new (not already checked) neurons connected to index neuron
+def get_new_neighbours(red, index, l):
+    neigh = np.arange(0, red.shape[0], 1)[red[index].astype(np.bool8)]
+    mask = np.isin(neigh, l, invert=True)
+    return neigh[mask]
+
+# Update the list to keep track of the progress
+def save(neigh, n_fam,  l, lll):
+    l = l+neigh.tolist()
+    lll[n_fam] += neigh.size
+    return l, lll
+
+# Recursive function to find the connected family starting from i neuron
+def get_active_connected(red, i,  l, lll, n_fam):
+    new_neigh = get_new_neighbours(red, i, l)
+    if new_neigh.size != 0:
+        l, lll = save(new_neigh, n_fam, l, lll)
+        for j in new_neigh:
+            l, lll = get_active_connected(red, j, l, lll, n_fam)
+    return l, lll
+
+# Returns a vector containing the dimensions of all the connected active regions
+# Takes as input the reduced adjacent matrix of the active neurons
+def get_families(reduced):
+    n_active = len(reduced)
+    n_fam = -1
+    l = []  # list of already checked neurons
+    lll = []  # dimensions of active-connected regions
+
+    # Proper beginning of search, saving to new "family"
+    for i in range(n_active):
+        if i not in l:  # if node i is not already checked and saved in l, go on
+            n_fam += 1
+            l.append(i)
+            lll.append(1)
+            l, lll = get_active_connected(reduced, i, l, lll, n_fam)
+
+    # Return the list
+    return sorted(lll, reverse=True)
