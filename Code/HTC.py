@@ -93,6 +93,7 @@ def get_cluster(reduced, checked, n, temp_cluster_elements, n_neurons):
     nearest = List()
     nearest.append(0)
     nearest.remove(0)
+    #nearest=[]
     for m in range(n_neurons):
         if (not n == m) and reduced[n, m] > 0:  # find the nearest neighbours
             nearest.append(m)
@@ -117,6 +118,7 @@ def get_cc(W, n_neurons, active):
             temp_cluster_elements = List()
             temp_cluster_elements.append(0)
             temp_cluster_elements.remove(0)
+            #temp_cluster_elements=[]
             # find the list of the neurons connected to n
             cluster_elements = get_cluster(
                 reduced, checked, n, temp_cluster_elements, n_neurons)
