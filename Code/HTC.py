@@ -16,7 +16,8 @@ class Brain:
     def simulation(self, active_frac=0.1, n_runs=100,
                    tmin=0.001, tmax=0.3, delta_tc=0.1,
                    dt=0.1, n_timesteps=600,
-                   compute_s1_s2=False, s_step=10):
+                   compute_s1_s2=False, s_step=10,
+                   compute_s_distrib=False, tc_distrib=0.12):
 
         n_neurons = self.n_neurons
         total_time = dt*n_timesteps
@@ -29,6 +30,7 @@ class Brain:
         sigma_activity = np.zeros_like(tc, dtype=np.float64)
         s1 = np.zeros_like(tc, dtype=np.float64)
         s2 = np.zeros_like(tc, dtype=np.float64)
+        s_distribution = np.zeros(n_runs*n_neurons, dtype=np.float64)
 
         # Init of random states for the simulation
         states_init = generate_initial_conf(active_frac=active_frac,
@@ -49,6 +51,8 @@ class Brain:
                                 dtype=np.float64)
                 s2_t = np.zeros(n_timesteps//s_step,
                                 dtype=np.float64)
+                s_dist = np.zeros(
+                    (n_timesteps//s_step, n_runs * n_neurons), dtype=np.float64)
 
             # Initial adjustment of the system
             for dummy in range(100):
@@ -64,10 +68,16 @@ class Brain:
                                                     r1=self.r1, r2=self.r2, tc=tc_testing, W=self.W)
                 activity_rtn[:, timestep] = temp_active
 
-                if compute_s1_s2:
-                    if timestep % s_step == 0:
-                        s1_t[timestep//s_step], s2_t[timestep //
-                                                     s_step] = get_conn_comp(self.W, temp_active)
+                # for the spcified timesteps
+                if timestep % s_step == 0:
+                    # save s1 and s2
+                    if compute_s1_s2:
+                        s1_t[timestep//s_step],s2_t[timestep // s_step],s_dist[timestep//s_step]= get_conn_comp(self.W, temp_active)
+                        #s_dist[timestep//s_step] = get_conn_comp(
+                         #   self.W, temp_active)
+                        if compute_s_distrib:
+                            if tc_testing < tc_distrib+0.001 and tc_distrib-0.001<=tc_testing:
+                                s_distribution = s_dist.flatten()
 
             At = np.mean(activity_rtn, axis=2)
             activity[i_tc] = np.mean(At)
@@ -75,12 +85,17 @@ class Brain:
             if compute_s1_s2:
                 s1[i_tc] = np.mean(s1_t)
                 s2[i_tc] = np.mean(s2_t)
-            else:
-                s1 = s2 = 1
 
         del activity_rtn
         # Return vector of tc and associated activities
-        return tc, activity, sigma_activity, s1, s2
+        if not compute_s1_s2 and not compute_s_distrib:
+            return tc, activity, sigma_activity
+        elif compute_s1_s2 and not compute_s_distrib:
+            return tc, activity, sigma_activity, s1, s2
+        elif compute_s1_s2 and not compute_s_distrib:
+            return tc, activity, sigma_activity, s1, s2
+        elif compute_s1_s2 and compute_s_distrib:
+            return tc, activity, sigma_activity, s1, s2, s_distribution
 
  ##################################
 
@@ -93,7 +108,6 @@ def get_cluster(reduced, checked, n, temp_cluster_elements, n_neurons):
     nearest = List()
     nearest.append(0)
     nearest.remove(0)
-    #nearest=[]
     for m in range(n_neurons):
         if (not n == m) and reduced[n, m] > 0:  # find the nearest neighbours
             nearest.append(m)
@@ -118,16 +132,13 @@ def get_cc(W, n_neurons, active):
             temp_cluster_elements = List()
             temp_cluster_elements.append(0)
             temp_cluster_elements.remove(0)
-            #temp_cluster_elements=[]
             # find the list of the neurons connected to n
             cluster_elements = get_cluster(
                 reduced, checked, n, temp_cluster_elements, n_neurons)
             connected_comp[n] = len(cluster_elements)
 
-    connected_comp = -np.sort(-connected_comp)  # sort the connected components
-
-    # return s1 and s2 for the specific run
-    return connected_comp[0], connected_comp[1]
+    # return sizes of clusters
+    return -np.sort(-connected_comp)
 
 
 @jit(nopython=True, parallel=True)
@@ -135,12 +146,14 @@ def get_conn_comp(W, active):
     n_runs, n_neurons = active.shape
     s1_r = np.zeros(n_runs, dtype=np.float64)
     s2_r = np.zeros(n_runs, dtype=np.float64)
+    s_dist = np.zeros((n_runs, n_neurons), dtype=np.float64)
 
-    for r in prange(n_runs):  # analyze avaery run
-        s1_r[r], s2_r[r] = get_cc(W, n_neurons, active[r])
+    for r in prange(n_runs):  # analyze every run
+        s_dist[r] = get_cc(W, n_neurons, active[r])
+        s1_r[r], s2_r[r] = s_dist[r, 0], s_dist[r, 1]
 
     # return s1 and s2 for specific timestep
-    return np.mean(s1_r), np.mean(s2_r)
+    return np.mean(s1_r), np.mean(s2_r), s_dist.flatten()
 
 
 @jit(nopython=True)
