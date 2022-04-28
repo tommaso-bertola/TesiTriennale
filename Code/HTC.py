@@ -30,7 +30,7 @@ class Brain:
         sigma_activity = np.zeros_like(tc, dtype=np.float64)
         s1 = np.zeros_like(tc, dtype=np.float64)
         s2 = np.zeros_like(tc, dtype=np.float64)
-        s_distribution = np.zeros(n_runs*n_neurons, dtype=np.float64)
+        #s_distribution = np.zeros(n_runs*n_neurons, dtype=np.float64)
 
         # Init of random states for the simulation
         states_init = generate_initial_conf(active_frac=active_frac,
@@ -72,12 +72,10 @@ class Brain:
                 if timestep % s_step == 0:
                     # save s1 and s2
                     if compute_s1_s2:
-                        s1_t[timestep//s_step],s2_t[timestep // s_step],s_dist[timestep//s_step]= get_conn_comp(self.W, temp_active)
-                        #s_dist[timestep//s_step] = get_conn_comp(
-                         #   self.W, temp_active)
+                        s1_t[timestep//s_step],s2_t[timestep // s_step], s_dist[timestep//s_step]= get_conn_comp(self.W, temp_active)
                         if compute_s_distrib:
                             if tc_testing < tc_distrib+0.001 and tc_distrib-0.001<=tc_testing:
-                                s_distribution = s_dist.flatten()
+                                s_distribution = s_dist[s_dist>0].flatten()
 
             At = np.mean(activity_rtn, axis=2)
             activity[i_tc] = np.mean(At)
@@ -89,15 +87,23 @@ class Brain:
         del activity_rtn
         # Return vector of tc and associated activities
         if not compute_s1_s2 and not compute_s_distrib:
-            return tc, activity, sigma_activity
+            return tc, activity, sigma_activity,None,None,None
         elif compute_s1_s2 and not compute_s_distrib:
-            return tc, activity, sigma_activity, s1, s2
+            return tc, activity, sigma_activity, s1, s2,None
         elif compute_s1_s2 and not compute_s_distrib:
-            return tc, activity, sigma_activity, s1, s2
+            return tc, activity, sigma_activity, s1, s2,None
         elif compute_s1_s2 and compute_s_distrib:
             return tc, activity, sigma_activity, s1, s2, s_distribution
 
  ##################################
+
+def get_sizes_distribution(s_distrib):
+    x=np.arange(1,int(s_distrib.max())+1)
+    l=np.zeros(int(s_distrib.max()))
+    for i in range(int(s_distrib.max())):
+        l[i]=((s_distrib==i+1).astype(np.int16)).sum()
+    ll=l/l.sum()
+    return (x,ll)
 
 
 @jit(nopython=True)
@@ -109,11 +115,11 @@ def get_cluster(reduced, checked, n, temp_cluster_elements, n_neurons):
     nearest.append(0)
     nearest.remove(0)
     for m in range(n_neurons):
-        if (not n == m) and reduced[n, m] > 0:  # find the nearest neighbours
+        if ( n != m) and reduced[n, m] > 0:  # find the nearest neighbours
             nearest.append(m)
 
     for m in nearest:
-        if not checked[m]:
+        if checked[m]==False:
             temp_cluster_elements = get_cluster(
                 reduced, checked, m, temp_cluster_elements, n_neurons)
 
@@ -128,7 +134,9 @@ def get_cc(W, n_neurons, active):
     connected_comp = np.zeros(n_neurons)
 
     for n in range(n_neurons):
-        if not checked[n]:  # if not already checked
+        if checked[n]==False:  # if not already checked
+            if not active[n]>0:
+                continue
             temp_cluster_elements = List()
             temp_cluster_elements.append(0)
             temp_cluster_elements.remove(0)
@@ -150,7 +158,9 @@ def get_conn_comp(W, active):
 
     for r in prange(n_runs):  # analyze every run
         s_dist[r] = get_cc(W, n_neurons, active[r])
-        s1_r[r], s2_r[r] = s_dist[r, 0], s_dist[r, 1]
+        s1_r[r]= s_dist[r, 0]
+        s2_r[r] = s_dist[r, 1]
+
 
     # return s1 and s2 for specific timestep
     return np.mean(s1_r), np.mean(s2_r), s_dist.flatten()
