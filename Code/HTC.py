@@ -30,8 +30,6 @@ class Brain:
         # Arrays containing activity, sigma activity, s1 and s2
         fc_matrix = np.zeros(
             (tc.shape[0], n_neurons, n_neurons), dtype=np.float64)
-        total_activity = np.zeros(
-            (tc.shape[0], n_timesteps, n_runs, n_neurons), dtype=np.float64)
         activity = np.zeros_like(tc, dtype=np.float64)
         sigma_activity = np.zeros_like(tc, dtype=np.float64)
         s1 = np.zeros_like(tc, dtype=np.float64)
@@ -78,8 +76,9 @@ class Brain:
                     # save s1 and s2
                     if compute_s1_s2:
                         s1_t[timestep//s_step], \
-                        s2_t[timestep // s_step],\
-                        s_dist[timestep //s_step] = get_conn_comp(self.W, temp_active)
+                            s2_t[timestep // s_step],\
+                            s_dist[timestep //
+                                   s_step] = get_conn_comp(self.W, temp_active)
                         if compute_s_distrib:
                             if tc_testing < tc_distrib+0.001 and tc_distrib-0.001 <= tc_testing:
                                 s_distrib = s_dist[s_dist > 0].flatten()
@@ -109,18 +108,9 @@ class Brain:
         # Return what was calculated
         return return_dic
 
- ##################################
     def get_fc_matrix(self, activity_rtn, dt, n_runs,
                       low_freq=0.01, high_freq=0.1,
                       ntaps=115):
-
-        # HRF coefficients
-        a1 = 6
-        a2 = 12
-        b = 0.9
-        c = 0.35
-        d1 = a1*b
-        d2 = a2*b
 
         # Parameters
         n_neurons = self.n_neurons
@@ -129,6 +119,14 @@ class Brain:
         ntaps = ntaps
         band = [low_freq/nyquist_freq, high_freq/nyquist_freq]
         delay = 0.5 * (ntaps-1) / sample_rate
+
+        # HRF coefficients
+        a1 = 6
+        a2 = 12
+        b = 0.9
+        c = 0.35
+        d1 = a1*b
+        d2 = a2*b
 
         # HRF function
         # the hrf is sampled only for the first 25 seconds at a sample frequency of 10 Hz
@@ -139,19 +137,25 @@ class Brain:
         filt_fir = signal.firwin(ntaps, band,
                                  pass_zero=False, window='blackmanharris')
 
+        # Convolve activity with hrf
         convolved_signals = np.array(
             [np.array(
                 [np.convolve(activity_rtn[run, :, neuron], hrf, mode='same') for neuron in range(n_neurons)]) for run in range(n_runs)])
 
-        # Apply fir filter
+        # Apply fir filter to convolved signal
         filtered_signals = np.array(
             [np.array(
                 [np.convolve(convolved_signals[run, neuron, :], filt_fir, mode='valid') for neuron in range(n_neurons)]) for run in range(n_runs)])
 
+        # Compute FC matrix for each run.
+        # returns any array of (n_neurons,n_neurons)
         fc_filtered_signals = np.array(
             [np.corrcoef(filtered_signals[i]) for i in range(n_runs)])
 
+        # Take the mean of all n_runs as if they were coming from different people
         return np.mean(fc_filtered_signals, axis=0)
+
+##################################
 
 
 def get_sizes_distribution(s_distrib):
@@ -284,13 +288,3 @@ def update_states(states, r1, r2, tc, W):
         temp_states[run] = update_neurons(states[run], r1, r2, tc, W)
 
     return temp_states, (temp_states == 1).astype(np.float64)
-
-
-if __name__ == "__main__":
-    W = np.loadtxt("Data/connectivity_matrix/weights.txt")
-    W = W/W.sum(axis=1)[:, None]
-    brain = Brain(W)
-    brain.set_netowrk_parameters(r1=2e-3, r2=0.288, tc=0.15)
-    tc, a, sigma_a, s1, s2 = brain.simulation(active_frac=0.1, n_runs=100,
-                                              tmin=0.005, tmax=0.2, delta_tc=0.005,
-                                              dt=0.1, n_timesteps=600)
