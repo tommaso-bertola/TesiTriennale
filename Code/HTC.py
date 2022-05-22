@@ -18,7 +18,7 @@ class Brain:
                    tmin=0.001, tmax=0.3, delta_tc=0.1,
                    dt=0.1, n_timesteps=600,
                    compute_s1_s2=False, s_step=10,
-                   compute_s_distrib=False, tc_distrib=0.12,
+                   compute_s_distrib=False, tc_distrib=0.15,
                    compute_fc=False):
 
         n_neurons = self.n_neurons
