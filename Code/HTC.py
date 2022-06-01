@@ -2,17 +2,32 @@ import numpy as np
 from numba import jit, prange
 from numba.typed import List
 from scipy import signal
+from Simulation import *
+from Utilities import *
+from Connectome import *
 
 
 class Brain:
-    def __init__(self, W) -> None:
-        self.W = W
-        self.n_neurons = W.shape[0]
+    def __init__(self) -> None:
+        pass
 
-    def set_netowrk_parameters(self, r1, r2, tc):
+    def connectome(self, W, normalize=False):
+        self.W=W
+        self.n_neurons=W.shape[0]
+        if normalize:
+            self.normalize_connectome()
+        else:
+            print('Connectome loaded but not yet normalized')
+        return self.W.shape[0]
+
+    def normalize_connectome(self):
+        self.W=self.W/self.W.sum(axis=1)[:,None]
+        print('Connectome of shape '+str(self.W.shape)+' now loaded and normalized successfully')
+
+    def set_netowrk_parameters(self, r1, r2):
         self.r1 = r1
         self.r2 = r2
-        self.tc = tc
+        print('r1 and r2 parameters now set successfully')
 
     def simulation(self, active_frac=0.1, n_runs=100,
                    tmin=0.001, tmax=0.3, delta_tc=0.1,
@@ -156,135 +171,3 @@ class Brain:
         return np.mean(fc_filtered_signals, axis=0)
 
 ##################################
-
-
-def get_sizes_distribution(s_distrib):
-    x = np.arange(1, int(s_distrib.max())+1)
-    l = np.zeros(int(s_distrib.max()))
-    for i in range(int(s_distrib.max())):
-        l[i] = ((s_distrib == i+1).astype(np.int16)).sum()
-    ll = l/l.sum()
-    return (x, ll)
-
-
-@jit(nopython=True)
-def get_cluster(reduced, checked, n, temp_cluster_elements, n_neurons):
-    temp_cluster_elements.append(n)  # save the neuron n
-    checked[n] = True  # confirm it was checked
-
-    nearest = List()
-    nearest.append(0)
-    nearest.remove(0)
-    for m in range(n_neurons):
-        if (n != m) and reduced[n, m] > 0:  # find the nearest neighbours
-            nearest.append(m)
-
-    for m in nearest:
-        if checked[m] == False:
-            temp_cluster_elements = get_cluster(
-                reduced, checked, m, temp_cluster_elements, n_neurons)
-
-    return temp_cluster_elements
-
-
-@jit(nopython=True)
-def get_cc(W, n_neurons, active):
-    reduced = (W*active).T*active
-
-    checked = np.zeros(n_neurons, dtype=np.bool_)
-    connected_comp = np.zeros(n_neurons)
-
-    for n in range(n_neurons):
-        if checked[n] == False:  # if not already checked
-            if not active[n] > 0:
-                continue
-            temp_cluster_elements = List()
-            temp_cluster_elements.append(0)
-            temp_cluster_elements.remove(0)
-            # find the list of the neurons connected to n
-            cluster_elements = get_cluster(
-                reduced, checked, n, temp_cluster_elements, n_neurons)
-            connected_comp[n] = len(cluster_elements)
-
-    # return sizes of clusters
-    return -np.sort(-connected_comp)
-
-
-@jit(nopython=True, parallel=True)
-def get_conn_comp(W, active):
-    n_runs, n_neurons = active.shape
-    s1_r = np.zeros(n_runs, dtype=np.float64)
-    s2_r = np.zeros(n_runs, dtype=np.float64)
-    s_dist = np.zeros((n_runs, n_neurons), dtype=np.float64)
-
-    for r in prange(n_runs):  # analyze every run
-        s_dist[r] = get_cc(W, n_neurons, active[r])
-        s1_r[r] = s_dist[r, 0]
-        s2_r[r] = s_dist[r, 1]
-
-    # return s1 and s2 for specific timestep
-    return np.mean(s1_r), np.mean(s2_r), s_dist.flatten()
-
-
-@jit(nopython=True)
-def generate_initial_conf(active_frac, n_neurons, n_runs):
-    """
-    Generate n_runs initial *random* configurations of states for every n_neuron 
-    """
-    # total numeber of active neurons
-    active_neurons = int(active_frac*n_neurons)
-
-    # init of array with random configurations
-    temp_states = np.zeros(n_neurons, dtype=np.float64)
-
-    # set to 1 active neurons
-    # set to -1 (refractary) the remaining half of neurons
-    temp_states[0:active_neurons] = 1
-    temp_states[-(n_neurons-active_neurons)//2:] = -1
-
-    # create matrix to store initial confs
-    states = np.zeros((n_runs, n_neurons), dtype=np.float64)
-
-    # generate n_runs different states
-    # shuffles the original temp_states
-    # distribution of active and refracatry neurons
-    for run in prange(n_runs):
-        states[run] = np.random.choice(temp_states, n_neurons, replace=False)
-        # (source, output array length, do not take twice)
-
-    return states
-
-
-@jit(nopython=True)
-def update_neurons(state_neurons, r1, r2, tc, W):
-    # generate n_neurons random numbers
-    p = np.random.random(state_neurons.shape[0])
-
-    # get the array of active neurons
-    active_nodes = (state_neurons == 1).astype(np.float64)
-
-    # compute the probability of becoming active for each neuron
-    # and store it inside an array
-    prob_active = r1+(1-r1)*(W@active_nodes > tc)
-
-    # active->inactive
-    # inactive->active following prob_active
-    # refractary->inactive following r2
-    return ((state_neurons == 1)*(-1) +
-            (state_neurons == 0)*(p < prob_active) +
-            (state_neurons == -1)*(p > r2)*(-1))
-
-
-@jit(nopython=True)
-def update_states(states, r1, r2, tc, W):
-    # save the number of runs in total
-    n_runs = states.shape[0]
-
-    # temp states with same dims as states
-    temp_states = np.zeros(states.shape, dtype=np.float64)
-
-    # compute for each run the new activity status
-    for run in prange(n_runs):
-        temp_states[run] = update_neurons(states[run], r1, r2, tc, W)
-
-    return temp_states, (temp_states == 1).astype(np.float64)
