@@ -91,6 +91,8 @@ def fmri_signal(subject=1, all_blocks=False):
         return a
 
 # return the fc empirical matrix with the right order
+
+
 def fc_empirical():
     # Getting ready for ordering of data using Hagmann way
     labels_ponce = np.loadtxt('../Data/fMRI/ROIs_Labels.txt', dtype=str)
@@ -118,39 +120,68 @@ def fc_empirical():
     corr = np.mean(correlations, axis=0)
     return corr
 
-def remove_zeroes(fc):
-    n_neurons=fc.shape[0]
-    #indexes of weights to be set to 0
-    range_zeroes= [(n_neurons+1)*i for i in range(n_neurons)]
-    fc_temp=np.copy(fc)
+
+def set_to_zero(fc):
+    n_neurons = fc.shape[0]
+    # indexes of weights to be set to 0
+    range_zeroes = [(n_neurons+1)*i for i in range(n_neurons)]
+    fc_temp = np.copy(fc)
     for i in range_zeroes:
-        fc_temp.flat[i]=0
-    
-    #return the fc matrix with 0 in the diagonal
+        fc_temp.flat[i] = 0
+
+    # return the fc matrix with 0 in the diagonal
     return fc_temp
 
 
-def rho_chi_added_weights(fc_empirical, output):
-    n_added_weights=len(output)
-    n_tc=output[0]['tc'].shape[0]
-    n_bins=50
+def remove_zeroes(fc):
+    n_neurons = fc.shape[0]
+    # indexes of weights to be set to 0
+    range_zeroes = [(n_neurons+1)*i for i in range(n_neurons)]
+    fc_temp = np.zeros_like(fc)
+    fc_temp = np.delete(fc.flatten(), range_zeroes)
+    # return the fc matrix with 0 in the diagonal
+    return fc_temp
 
-    rho=np.zeros((n_added_weights, n_tc))
-    chi=np.zeros((n_added_weights, n_tc))
+# Compute rho and chi now using only upper diagonal elements of fc matrix to avoid repetition
+# you can still use all the matrix, but the diagonal elements will be removed from the computation
 
 
-    h_fmri,_=np.histogram(fc_empirical, bins=n_bins)
-    h_fmri=h_fmri/h_fmri.sum()
+def rho_chi_added_weights(output, mode='upper'):
+    n_added_weights = len(output)
+    n_tc = output[0]['tc'].shape[0]
+    n_bins = 50
+    fc_emp = fc_empirical()
 
+    if mode == 'upper':
+        triu_indices = np.triu_indices(fc_emp.shape[0], 1)
+        fc_emp = fc_emp[triu_indices]
+    if mode == 'zeroes':
+        fc_emp = remove_zeroes(fc_emp)
+    if mode == 'set':
+        fc_emp = set_to_zero(fc_emp)
+
+    rho = np.zeros((n_added_weights, n_tc))
+    chi = np.zeros((n_added_weights, n_tc))
+
+    h_fmri, _ = np.histogram(fc_emp, bins=n_bins)
+    h_fmri = h_fmri/h_fmri.sum()
 
     for w in range(n_added_weights):
         for i in range(n_tc):
-            fc_sim=remove_zeroes(output[w]['fc'][i])
+            # fc_sim=remove_zeroes(output[w]['fc'][i])
+            fc_sim = output[w]['fc'][i]
 
-            h_norm,_=np.histogram(fc_sim, bins=n_bins)
-            h_norm=h_norm/h_norm.sum()
+            if mode == 'upper':
+                fc_sim = fc_sim[triu_indices]
+            if mode == 'zeroes':
+                fc_sim = remove_zeroes(fc_sim)
+            if mode == 'set':
+                fc_sim = set_to_zero(fc_sim)
 
-            rho[w,i]=np.corrcoef(fc_empirical.flatten(), fc_sim.flatten())[1,0]
-            chi[w,i]=np.sqrt(np.nansum((h_fmri-h_norm)**2/(h_fmri+h_norm)))
+            h_norm, _ = np.histogram(fc_sim, bins=n_bins)
+            h_norm = h_norm/h_norm.sum()
+
+            rho[w, i] = np.corrcoef(fc_emp, fc_sim)[1, 0]
+            chi[w, i] = np.sqrt(np.nansum((h_fmri-h_norm)**2/(h_fmri+h_norm)))
 
     return rho, chi

@@ -2,11 +2,21 @@ import numpy as np
 
 # example of variable attempts
 #attempts = [10, 20, 100, 300, 500]
+#attempts={0:1,10:10,15:10}
+def connectome_attempter(attempts, mode,W):
+    output=[[dict() for i in range(attempts[j])]for j in attempts]
+    w_new=[np.zeros((attempts[j], 66,66)) for j in attempts]
+    if mode=='add':
+        for i,j in enumerate(attempts):
+            w_new[i]=modify_connectome(W,attempts[j],j)
+    if mode=='enhance':
+        for i,j in enumerate(attempts):
+            w_new[i]=enhance_connectome(W,attempts[j],j)
+    return output,w_new
 
 
-def modify_connectome(W, attempts):
+def modify_connectome(W, n_attempts, n_to_fill):
     # parameters
-    n_attempts = len(attempts)
     n_neurons = W.shape[0]
     h_neurons = int(n_neurons/2)  # half the number of total neurons
 
@@ -26,7 +36,7 @@ def modify_connectome(W, attempts):
                     for j in range(h_neurons) if lr_orig[i, j] == 0]
 
     # create the modified connectomes
-    for j, n_to_fill in enumerate(attempts):
+    for j in range(n_attempts):
         # check
         if n_to_fill > len(empty_coords):
             print('n_to_fill bigger than possible new weights')
@@ -49,6 +59,34 @@ def modify_connectome(W, attempts):
         w_tmp[h_neurons:, 0:h_neurons] = lr_mod.T
         w_all[j] = w_tmp
 
+    return w_all
+
+
+def enhance_connectome(W, n_attempts):
+    # parameters
+    n_neurons = W.shape[0]
+    h_neurons = int(n_neurons/2)  # half the number of total neurons
+    # array of all modified connectomes
+    # this array will be returned by this function
+    w_all = np.zeros((n_attempts, n_neurons, n_neurons), dtype=np.float64)
+    # get only LR emisphere
+    # it is a matrix n_neurons/2 x n_neurons/2
+    lr_orig = lr_emisphere(W)
+    # tuples of not empty indexes
+    not_empty_coords = [(i, j)for i in range(h_neurons)
+                    for j in range(h_neurons) if lr_orig[i, j] != 0]
+    # create the modified connectomes
+    for j in range(n_attempts):
+
+        # lr to be modified
+        lr_mod = np.copy(lr_orig)
+        for i in range(len(not_empty_coords)):  # the number of empty places i want to fill
+            lr_mod[not_empty_coords[i][0], not_empty_coords[i][1]] = lr_orig[not_empty_coords[i][0], not_empty_coords[i][1]]*1.1
+        # save the modified connectomes to w_all
+        w_tmp = np.copy(W)
+        w_tmp[0:h_neurons, h_neurons:] = lr_mod
+        w_tmp[h_neurons:, 0:h_neurons] = lr_mod.T
+        w_all[j] = w_tmp
     return w_all
 
 

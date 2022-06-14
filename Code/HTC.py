@@ -7,13 +7,16 @@ from Utilities import *
 from Connectome import *
 
 
+########################################################
+# Object containing all important and parallel stuff   #
+########################################################
 class Brain:
     def __init__(self) -> None:
         pass
 
     def connectome(self, W, normalize=False):
-        self.W=W
-        self.n_neurons=W.shape[0]
+        self.W = W
+        self.n_neurons = W.shape[0]
         if normalize:
             self.normalize_connectome()
         else:
@@ -21,8 +24,9 @@ class Brain:
         return self.W.shape[0]
 
     def normalize_connectome(self):
-        self.W=self.W/self.W.sum(axis=1)[:,None]
-        print('Connectome of shape '+str(self.W.shape)+' now loaded and normalized successfully')
+        self.W = self.W/self.W.sum(axis=1)[:, None]
+        print('Connectome of shape '+str(self.W.shape) +
+              ' now loaded and normalized successfully')
 
     def set_netowrk_parameters(self, r1, r2):
         self.r1 = r1
@@ -171,3 +175,23 @@ class Brain:
         return np.mean(fc_filtered_signals, axis=0)
 
 ##################################
+
+
+def advanced_simulation(w_new, brain, output, 
+                        active_frac=0.1, n_runs=100,
+                        tmin=0.001, tmax=0.3, delta_tc=0.1,
+                        dt=0.1, n_timesteps=600,
+                        compute_s1_s2=False, s_step=10,
+                        compute_s_distrib=False, tc_distrib=0.15,
+                        compute_fc=False,
+                        ):
+    for i in range(len(w_new)):
+        for j in range(len(w_new[i])):
+            brain.connectome(w_new[i][j], normalize=True)
+            output[i][j] = brain.simulation(active_frac=active_frac, n_runs=n_runs,
+                                            tmin=tmin, tmax=tmax, delta_tc=delta_tc,
+                                            dt=dt, n_timesteps=n_timesteps,
+                                            compute_s1_s2=compute_s1_s2, s_step=s_step,
+                                            compute_s_distrib=compute_s_distrib, tc_distrib=tc_distrib,
+                                            compute_fc=compute_fc)
+    return output
