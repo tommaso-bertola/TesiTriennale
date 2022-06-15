@@ -129,3 +129,4 @@ Papers/
 Data/**/*.PDF
 Data/
 Output/
+*.bin
