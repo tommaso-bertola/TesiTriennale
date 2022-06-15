@@ -147,7 +147,7 @@ def remove_zeroes(fc):
 
 
 def rho_chi_added_weights(output, mode='upper'):
-    n_added_weights = len(output)
+    n_attempts = len(output)
     n_tc = output[0]['tc'].shape[0]
     n_bins = 50
     fc_emp = fc_empirical()
@@ -160,28 +160,28 @@ def rho_chi_added_weights(output, mode='upper'):
     if mode == 'set':
         fc_emp = set_to_zero(fc_emp)
 
-    rho = np.zeros((n_added_weights, n_tc))
-    chi = np.zeros((n_added_weights, n_tc))
+    rho = np.zeros((n_attempts, n_tc))
+    chi = np.zeros((n_attempts, n_tc))
 
     h_fmri, _ = np.histogram(fc_emp, bins=n_bins)
     h_fmri = h_fmri/h_fmri.sum()
 
-    for w in range(n_added_weights):
+    for w in range(n_attempts):
         for i in range(n_tc):
             # fc_sim=remove_zeroes(output[w]['fc'][i])
             fc_sim = output[w]['fc'][i]
 
             if mode == 'upper':
-                fc_sim = fc_sim[triu_indices]
+                fc_sim_t = fc_sim[triu_indices]
             if mode == 'zeroes':
-                fc_sim = remove_zeroes(fc_sim)
+                fc_sim_t= remove_zeroes(fc_sim)
             if mode == 'set':
-                fc_sim = set_to_zero(fc_sim)
+                fc_sim_t = set_to_zero(fc_sim)
 
-            h_norm, _ = np.histogram(fc_sim, bins=n_bins)
+            h_norm, _ = np.histogram(fc_sim_t, bins=n_bins)
             h_norm = h_norm/h_norm.sum()
 
-            rho[w, i] = np.corrcoef(fc_emp, fc_sim)[1, 0]
+            rho[w, i] = np.corrcoef(fc_emp.flatten(), fc_sim_t.flatten())[1, 0]
             chi[w, i] = np.sqrt(np.nansum((h_fmri-h_norm)**2/(h_fmri+h_norm)))
 
     return rho, chi
