@@ -1,0 +1,46 @@
+Lista non in ordine delle figure da includere/realizzare
+Alcune righe in realtà sono più figure da realizzare
+
+// Connettoma //
+- matrice connettoma, ovvero dare un'intuizione del significatto dei pesi
+	* a 66
+	* a 998
+- distribuzione di in-degree connettoma, ovvero un istogramma con logy e in x il peso dei link
+	* eventualmente prima e dopo la normalizzazione per mostrare differenze se visibilmente significative
+- CDF dei pesi del connettoma, per spiegare come ho poi trovato la nuova distribuzione con inverse sampling
+- posizione spaziale delle ROI per parcellizzazione a 66
+	* magari usando una proiezione in 2d o in 3d con gif
+	* usare i nomi assegnati da Ponce o da Hagmann
+- matrice del nuovo connettoma modificato
+	* mostrare dove sono stati aggiunti i nuovi link
+
+// Simulazione //
+- facile grafichetto che mostra evoluzione temporale di 3/4 nodi
+	* dare intuizione del modello di cellular automata
+- attivazioni dei nodi in funzione del tempo 
+	* come se fosse un tracciato eeg
+	* per un tempo "breve" (~200 steps) e magari a 998 nodi
+	* per dare intuizione di come i neuroni si attivino in maniera correlata
+- l'array gigantesco 3-dim con sezioni 2d
+	* è solo una rappresentazione grafica realizzata probabilmente con illustrator dato che sarà difficile mostrare i dettagli (n_step, n_neurons e n_runs)
+	* le sezioni 2d sono in corrispondenza delle operazioni svolte dalla simulazione per estrarre i vari osservabili
+- A, sigmaA, S1, S2 in funzione di Tc con r1 e r2 fissati
+	* con e senza normalizzazione
+	* separando o sovrapponendo nello stesso grafico il con e senza la normalizzazione
+	* mostrando le differenze di ciascun run e poi la media dei run
+- distribuzione dei cluster size per la simulazione in corrispondenza della tc che realizza la massima S2 o sigamA
+- i due punti precedenti *ma* con il connettoma con nuovi link
+
+// Digital Signal Processing //
+- esempio di eeg registrato da Ponce
+- HRF con i suoi parametri
+- mostrare esempio di convoluzione con attività simulata (le delta di Dirac)
+- filtraggio frequenze in range 
+	* mostrare come ho ottenuto il filtro FIR
+	* usare spettrogramma prima e dopo il filtraggio
+
+// Confronto simulazione e dati empirici //
+- FC matrix per dati empirici e simulati 
+	* per i dati simulati mostrare la FC in corrispondenza della tc e lontano da essa
+- rho e chi2 in funzione della tc
+	* differenziare per connettoma non normalizzato, normalizzato e modificato

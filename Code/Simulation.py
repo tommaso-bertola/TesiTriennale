@@ -33,6 +33,10 @@ def generate_initial_conf(active_frac, n_neurons, n_runs):
 
 @jit(nopython=True)
 def update_neurons(state_neurons, r1, r2, tc, W):
+    '''
+    Given the current state of neurons as an array of integers,
+    returns an updated array of integers according to the simulation parameters
+    '''
     # generate n_neurons random numbers
     p = np.random.random(state_neurons.shape[0])
 
@@ -53,6 +57,9 @@ def update_neurons(state_neurons, r1, r2, tc, W):
 
 @jit(nopython=True)
 def update_states(states, r1, r2, tc, W):
+    '''
+    Given the states of all neurons and runs, compute the states for the next step
+    '''
     # save the number of runs in total
     n_runs = states.shape[0]
 

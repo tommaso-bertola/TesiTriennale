@@ -8,6 +8,10 @@ from numba.typed import List
 
 
 def get_sizes_distribution(s_distrib):
+    '''
+    Analyzing function for the compute_s_distrib
+    Returns the data for the log graph 
+    '''
     x = np.arange(1, int(s_distrib.max())+1)
     l = np.zeros(int(s_distrib.max()))
     for i in range(int(s_distrib.max())):
@@ -18,6 +22,9 @@ def get_sizes_distribution(s_distrib):
 
 @jit(nopython=True)
 def get_cluster(reduced, checked, n, temp_cluster_elements, n_neurons):
+    '''
+    Given the number of neuron, identify the cluseter it belongs to and return the elements of the cluster
+    '''
     temp_cluster_elements.append(n)  # save the neuron n
     checked[n] = True  # confirm it was checked
 
@@ -38,6 +45,9 @@ def get_cluster(reduced, checked, n, temp_cluster_elements, n_neurons):
 
 @jit(nopython=True)
 def get_cc(W, n_neurons, active):
+    '''
+    Returns a decreasing ordered array of cluster sizes
+    '''
     reduced = (W*active).T*active
 
     checked = np.zeros(n_neurons, dtype=np.bool_)
@@ -61,6 +71,9 @@ def get_cc(W, n_neurons, active):
 
 @jit(nopython=True, parallel=True)
 def get_conn_comp(W, active):
+    '''
+    Return s1, s2 and sizes distribution, according to the given connectome and active neurons
+    '''
     n_runs, n_neurons = active.shape
     s1_r = np.zeros(n_runs, dtype=np.float64)
     s2_r = np.zeros(n_runs, dtype=np.float64)
@@ -79,9 +92,11 @@ def get_conn_comp(W, active):
 # Load fMRI signal and compute FC empirical matrix with the right order #
 #########################################################################
 
-# Load data from specific subject
-# Choose to read both blocks or not
 def fmri_signal(subject=1, all_blocks=False):
+    '''
+    Load data from specific subject
+    Choose to read both blocks or not
+    '''
     if all_blocks == True:
         a = np.loadtxt("../Data/fMRI/subj"+str(subject)+"_block1.txt")
         b = np.loadtxt("../Data/fMRI/subj"+str(subject)+"_block2.txt")
@@ -90,10 +105,13 @@ def fmri_signal(subject=1, all_blocks=False):
         a = np.loadtxt("../Data/fMRI/subj"+str(subject)+"_block1.txt")
         return a
 
-# return the fc empirical matrix with the right order
 
 
 def fc_empirical():
+    '''
+    Return the fc empirical matrix with the right order
+    The order is the same as the one used to simulate the brain activity
+    '''
     # Getting ready for ordering of data using Hagmann way
     labels_ponce = np.loadtxt('../Data/fMRI/ROIs_Labels.txt', dtype=str)
     labels_hagmann = np.loadtxt("../Data/connectivity_matrix/centres.txt",
@@ -122,6 +140,9 @@ def fc_empirical():
 
 
 def set_to_zero(fc):
+    '''
+    Sets to zeros the diagonal elements of the fc
+    '''
     n_neurons = fc.shape[0]
     # indexes of weights to be set to 0
     range_zeroes = [(n_neurons+1)*i for i in range(n_neurons)]
@@ -134,6 +155,9 @@ def set_to_zero(fc):
 
 
 def remove_zeroes(fc):
+    '''
+    Removes the diagonal elements of the fc
+    '''
     n_neurons = fc.shape[0]
     # indexes of weights to be set to 0
     range_zeroes = [(n_neurons+1)*i for i in range(n_neurons)]
@@ -142,11 +166,13 @@ def remove_zeroes(fc):
     # return the fc matrix with 0 in the diagonal
     return fc_temp
 
-# Compute rho and chi now using only upper diagonal elements of fc matrix to avoid repetition
-# you can still use all the matrix, but the diagonal elements will be removed from the computation
 
 
 def rho_chi_added_weights(output, mode='upper'):
+    '''
+    Compute rho and chi now using only upper diagonal elements of fc matrix to avoid repetition
+    you can still use all the matrix, but the diagonal elements will be removed from the computation
+    '''
     n_attempts = len(output)
     n_tc = output[0]['tc'].shape[0]
     n_bins = 50

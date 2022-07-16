@@ -1,9 +1,13 @@
 import numpy as np
 
-# example of variable attempts
-#attempts = [10, 20, 100, 300, 500]
-#attempts={0:1,10:10,15:10}
+
 def connectome_attempter(attempts, mode,W):
+    '''
+    Creator of new connectomes
+    Two methods are used: modify which adds new links, and enhance which strengthens the interemispherical links
+    Attepts has to be a dictionary with {# new links: #connectomes, ...} 
+    Example: attempts={0:1,10:10,15:10}
+    '''
     output=[[dict() for i in range(attempts[j])]for j in attempts]
     w_new=[np.zeros((attempts[j], 66,66)) for j in attempts]
     if mode=='add':
@@ -11,11 +15,16 @@ def connectome_attempter(attempts, mode,W):
             w_new[i]=modify_connectome(W,attempts[j],j)
     if mode=='enhance':
         for i,j in enumerate(attempts):
-            w_new[i]=enhance_connectome(W,attempts[j],j)
+            w_new[i]=enhance_connectome(W,attempts[j])
     return output,w_new
 
 
 def modify_connectome(W, n_attempts, n_to_fill):
+    '''
+    Add new interemishpheric links to the original connectomes
+    Use the inverse sampling technique
+    Fill random null links in the interemispheric sector of the connectome   
+    '''
     # parameters
     n_neurons = W.shape[0]
     h_neurons = int(n_neurons/2)  # half the number of total neurons
@@ -63,6 +72,9 @@ def modify_connectome(W, n_attempts, n_to_fill):
 
 
 def enhance_connectome(W, n_attempts):
+    '''
+    Only multiply by a factor of 1.1 the links in the interemispheric sector
+    '''
     # parameters
     n_neurons = W.shape[0]
     h_neurons = int(n_neurons/2)  # half the number of total neurons
@@ -92,6 +104,9 @@ def enhance_connectome(W, n_attempts):
 
 # returns only the lr emisphere of the connectome
 def lr_emisphere(W):
+    '''
+    Return the sector referring to the interemispheric connectome
+    '''
     n_neurons = W.shape[0]
     if n_neurons % 2 == 0:
         h_neurons=int(n_neurons/2)
@@ -103,6 +118,9 @@ def lr_emisphere(W):
 
 # generate random distribution following the original weights distribution
 def weights_distribution(W, n_weights=1000):
+    '''
+    Compute the new weights according to the distribution of all the weights in the connectome
+    '''
     # prepare distribution
     # remove 0 entries
     w = W[W != 0].flatten()
