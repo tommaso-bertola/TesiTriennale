@@ -54,7 +54,8 @@ class Brain:
                    dt=0.1, n_timesteps=600,
                    compute_s1_s2=False, s_step=10,
                    compute_s_distrib=False, tc_distrib=0.15,
-                   compute_fc=False):
+                   compute_fc=False, 
+                   save_rtn=False):
         '''
         The actual function computing the simulation and extracting the info
         It follows the steps:
@@ -90,6 +91,8 @@ class Brain:
             (tc.shape[0], n_neurons, n_neurons), dtype=np.float64)
         activity = np.zeros_like(tc, dtype=np.float64)
         sigma_activity = np.zeros_like(tc, dtype=np.float64)
+        if save_rtn:
+            complete_activity = np.zeros((tc.shape[0],n_runs, n_timesteps, n_neurons), dtype=np.float64)
         s1 = np.zeros_like(tc, dtype=np.float64)
         s2 = np.zeros_like(tc, dtype=np.float64)
 
@@ -149,12 +152,17 @@ class Brain:
                 s2[i_tc] = np.mean(s2_t)
             if compute_fc:
                 fc_matrix[i_tc] = self.get_fc_matrix(activity_rtn, dt, n_runs)
-            del activity_rtn
+            if save_rtn:
+                complete_activity[i_tc]=activity_rtn
+            else:
+                del activity_rtn
 
         return_dic = dict()
         return_dic['tc'] = tc
         return_dic['activity'] = activity
         return_dic['sigma_activity'] = sigma_activity
+        if save_rtn:
+            return_dic['activity_rtn']=complete_activity
         if compute_s_distrib:
             return_dic['s_distrib'] = s_distrib
         if compute_s1_s2:
@@ -205,7 +213,7 @@ class Brain:
         # Convolve activity with hrf
         convolved_signals = np.array(
             [np.array(
-                [np.convolve(activity_rtn[run, :, neuron], hrf, mode='same') for neuron in range(n_neurons)]) for run in range(n_runs)])
+                [np.convolve(activity_rtn[run, :, neuron], hrf, mode='valid') for neuron in range(n_neurons)]) for run in range(n_runs)])
 
         # Apply fir filter to convolved signal
         filtered_signals = np.array(
@@ -230,6 +238,7 @@ def advanced_simulation(w_new, brain, output,
                         compute_s1_s2=False, s_step=10,
                         compute_s_distrib=False, tc_distrib=0.15,
                         compute_fc=False,
+                        save_rtn=False
                         ):
     '''
     This function should be used to run the simulation instead of calling directly the simulation function of Brain
@@ -245,5 +254,6 @@ def advanced_simulation(w_new, brain, output,
                                             dt=dt, n_timesteps=n_timesteps,
                                             compute_s1_s2=compute_s1_s2, s_step=s_step,
                                             compute_s_distrib=compute_s_distrib, tc_distrib=tc_distrib,
-                                            compute_fc=compute_fc)
+                                            compute_fc=compute_fc, 
+                                            save_rtn=save_rtn)
     return output
