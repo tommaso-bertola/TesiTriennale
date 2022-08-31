@@ -130,3 +130,5 @@ Data/**/*.PDF
 Data/
 Output/
 *.bin
+*.pdf
+*.png
