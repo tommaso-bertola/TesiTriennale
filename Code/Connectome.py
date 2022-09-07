@@ -55,7 +55,7 @@ def modify_connectome(W, n_attempts, n_to_fill):
         # shuffle to avoid repeating patterns on new connectome
         np.random.shuffle(empty_coords)
         np.random.shuffle(w_n)
-
+        
         # lr to be modified
         lr_mod = np.copy(lr_orig)
 
@@ -117,7 +117,7 @@ def lr_emisphere(W):
         return
 
 # generate random distribution following the original weights distribution
-def weights_distribution(W, n_weights=1000):
+def weights_distribution(W, n_weights=10000):
     '''
     Compute the new weights according to the distribution of all the weights in the connectome
     '''
@@ -127,7 +127,8 @@ def weights_distribution(W, n_weights=1000):
 
     # compute histogram of distributions
     w_max = W.max()+0.01
-    hist, binning = np.histogram(w, bins=50, range=(0, w_max), density=True)
+    w_min=w.min()
+    hist, binning = np.histogram(w, bins=50, range=(w_min, w_max), density=True)
 
     # compute cumulative distribution
     cdf = np.cumsum(hist/hist.sum())
